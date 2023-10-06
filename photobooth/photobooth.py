@@ -1,14 +1,19 @@
 import sys
-import pygame
-import time
-import os
-from picamera import PiCamera
 from datetime import datetime
 import RPi.GPIO as GPIO
 from shutil import copy2
 from settings import Settings
+from pathlib import Path
+import time
+import os
 
-camera = PiCamera()
+import pygame
+#from picamera import PiCamera
+from picamera2 import Picamera2, Preview
+
+
+#camera = PiCamera()
+camera = Picamera2()
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 
@@ -26,14 +31,23 @@ class wedding_photobooth:
         screenw = self.screen.get_rect().width
         global  screenh
         screenh = self.screen.get_rect().height
-        
+        cam_config = camera.create_preview_configuration({"size": (1920, 1080)})
+        camera.configure(cam_config)
+        Path(self.settings.pic_storage).mkdir(parents=True, exist_ok=True)
+        Path(f"{self.settings.pic_storage}/gridPics/").mkdir(parents=True, exist_ok=True)
+
+        if self.settings.backup_pics == True:
+            Path(self.settings.pic_backup).mkdir(parents=True, exist_ok=True)
+            Path(f"{self.settings.pic_backup}/gridPics/").mkdir(parents=True, exist_ok=True)
+            Path(f"{self.settings.pic_backup}/singlePics/").mkdir(parents=True, exist_ok=True)
+
     def display_start_screen(self):
         background = pygame.image.load(self.settings.intro_screen)
         background = pygame.transform.scale(background, (screenw, screenh))
         pygame.display.flip()
         self.screen.blit(background, (0, 0))
         pygame.display.update()
-        pygame.display.set_caption("Wedding Photobooth!")
+        pygame.display.set_caption("Photobooth!")
 
     def pic_countdown(self, pic_num, total_pics, timestamp):
         
@@ -116,14 +130,21 @@ class wedding_photobooth:
 
     def take_photo(self, photo_in_series, pic_count, timestamp):
         #https://picamera.readthedocs.io/en/release-1.13/recipes1.html
-
-        camera.rotation = self.settings.camera_rotation
+        """
+        camera_config = picam2.create_preview_configuration()
+        picam2.configure(camera_config)
+        picam2.start_preview(Preview.QTGL)
+        picam2.start()
+        time.sleep(2)
+        picam2.capture_file("test.jpg")
+        """
+        #camera.rotation = self.settings.camera_rotation
         #camera.resolution = (1920, 1080)
-        camera.resolution = (1600, 900)
+        #camera.resolution = (1600, 900)
         # Set ISO to the desired value
-        camera.iso = 600
+        #camera.iso = 600
         # Wait for the automatic gain control to settle
-        time.sleep(1)
+        #time.sleep(1)
         # Now fix the values
         #camera.shutter_speed = 800
 
@@ -131,8 +152,14 @@ class wedding_photobooth:
         temp_file_name = "temp_file.jpg"
         #pygame.display.quit()
         #camera.start_preview()
+        #time.sleep(1)
+        camera.start_preview(Preview.QTGL)
+        camera.start(show_preview=True)
         time.sleep(1)
-        camera.capture(temp_file_name, use_video_port=False)
+        camera.capture_file(temp_file_name)
+        camera.stop_preview()
+        camera.stop()
+        #camera.capture(temp_file_name, use_video_port=False)
         final_pic = self.save_pics(temp_file_name, photo_in_series, total_pic_count, timestamp)
 
         return(final_pic)
@@ -158,9 +185,10 @@ class wedding_photobooth:
 
         if self.settings.backup_pics == True:
             print("Backup enabled")
-            backup_stroage = self.settings.pic_backup
-            bkup_file = backup_stroage + name_base + "_" + str(timestampOfSeries) + "_" + str(series_sub_photo) + "_of_" + str(photo_series) + ".jpg"
-            copy2(filename, bkup_file)
+            #backup_stroage = self.settings.pic_backup
+            #bkup_file = backup_stroage + name_base + "_" + str(timestampOfSeries) + "_" + str(series_sub_photo) + "_of_" + str(photo_series) + ".jpg"
+            backup_stroage = f"{self.settings.pic_backup}/singlePics"
+            copy2(filename, backup_stroage)
 
         return(filename)
         
@@ -174,14 +202,14 @@ class wedding_photobooth:
 
         gridPicLocation = prim_storage + gridFolder + name_base + str(timestampOfSeries) + ".jpg"
 
-        copy2('grid.jpeg', gridPicLocation)
+        copy2('grid.jpg', gridPicLocation)
         print(gridPicLocation)
 
         if self.settings.backup_pics == True:
             print("Backup enabled")
-            backup_stroage = self.settings.pic_backup
-            bkup_file = backup_stroage + gridFolder + name_base + "_" + str(timestampOfSeries) + ".jpg"
-            copy2(gridPicLocation, bkup_file)
+            backup_stroage = f"{self.settings.pic_backup}/gridPics"
+            #bkup_file = backup_stroage + gridFolder + name_base + "_" + str(timestampOfSeries) + ".jpg"
+            copy2(gridPicLocation, backup_stroage)
 
     def grid_display(self,files):
         """Display all 4 pictures to a grid"""
@@ -198,30 +226,30 @@ class wedding_photobooth:
         photo3 = pygame.image.load(pic3)
         photo4 = pygame.image.load(pic4)
 
-        pic_1_x = ((screenw / 2) * 0.94)
-        pic_1_y = ((screenh / 2) * 0.91)
+        pic_1_x = ((screenw / 2) * 0.949)
+        pic_1_y = ((screenh / 2) * 0.908)
 
         pic_1_x = int(pic_1_x)
         pic_1_y = int(pic_1_y)
 
-        pic_2_4_x_start = int(pic_1_x * 1.13)
-        pic_3_4_y_start = int(pic_1_y * 1.21)
+        pic_2_4_x_start = int(pic_1_x * 1.108)
+        pic_3_4_y_start = int(pic_1_y * 1.198)
         photo1 = pygame.transform.scale(photo1, (pic_1_x, pic_1_y))
-        photo2 = pygame.transform.scale(photo2, (pic_1_x, pic_1_y))
-        photo3 = pygame.transform.scale(photo3, (pic_1_x, pic_1_y))
+        photo2 = pygame.transform.scale(photo2, (pic_1_x, pic_1_y+4))
+        photo3 = pygame.transform.scale(photo3, (pic_1_x, pic_1_y+4))
         photo4 = pygame.transform.scale(photo4, (pic_1_x, pic_1_y))
 
         #   Photo grid
-        #   1 | 2
+        #   1 | 4
         #   -----
-        #   3 | 4
+        #   2 | 3
 
-        self.screen.blit(photo1, (0, 0))  # photo 1
-        self.screen.blit(photo2, (0, pic_3_4_y_start))  # photo 3
-        self.screen.blit(photo3, (pic_2_4_x_start, pic_3_4_y_start))  # photo 4
-        self.screen.blit(photo4, (pic_2_4_x_start, 0))  # photo 2
+        self.screen.blit(photo1, (0, 0)) 
+        self.screen.blit(photo2, (0, pic_3_4_y_start)) 
+        self.screen.blit(photo3, (pic_2_4_x_start, pic_3_4_y_start))
+        self.screen.blit(photo4, (pic_2_4_x_start, 0))
         pygame.display.update()
-        pygame.image.save(self.screen, "grid.jpeg")
+        pygame.image.save(self.screen, "grid.jpg")
         time.sleep(10)
 
 
